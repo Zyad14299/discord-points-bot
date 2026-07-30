@@ -344,21 +344,29 @@ async function handleViewAttendance(interaction) {
   const active = store.getAllActive();
 
   if (active.length === 0) {
-    await interaction.editReply({
-      content: 'ما في أحد مسجل دخول حالياً.',
-    });
+    const embed = new EmbedBuilder()
+      .setColor(0x2b2d31)
+      .setTitle('📋 الحضور الحالي')
+      .setDescription('> ما في أحد مسجل دخول حالياً.')
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
     return;
   }
 
+  const medals = ['🥇', '🥈', '🥉'];
+
   const lines = active.map((session, index) => {
-    return `**${index + 1}.** <@${session.userId}> — دخل ${discordTimestamp(session.loginAt)} (${discordTimestamp(session.loginAt, 'R')})`;
+    const medal = medals[index] || `**${index + 1}.**`;
+    const duration = store.formatDuration(Math.floor((Date.now() - session.loginAt) / 60000));
+    return `${medal} <@${session.userId}>\n┗ ⏱️ ${discordTimestamp(session.loginAt, 'R')} • ${duration}`;
   });
 
   const embed = new EmbedBuilder()
-    .setColor(0x3498db)
-    .setTitle('المسجلين دخول حالياً 📋')
-    .setDescription(lines.join('\n'))
-    .setFooter({ text: `العدد: ${active.length}` })
+    .setColor(0x5865f2)
+    .setTitle('📋 الأعضاء المسجلين دخول حالياً')
+    .setDescription(lines.join('\n\n'))
+    .setFooter({ text: `👥 العدد: ${active.length} عضو` })
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
