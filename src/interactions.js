@@ -125,12 +125,56 @@ async function buildWeeklyEmbed(client, title = 'ساعات الحضور هذا 
     .setTimestamp();
 }
 
+// ─── دوال اللوق ───────────────────────────────────────────────
+
+async function sendLoginLog(client, userId, loginAt) {
+  const logChannelId = config.logChannelId;
+  if (!logChannelId) return;
+
+  let channel = client.channels.cache.get(logChannelId);
+  if (!channel) channel = await client.channels.fetch(logChannelId).catch(() => null);
+  if (!channel) return;
+
+  const embed = new EmbedBuilder()
+    .setColor(0x57f287)
+    .setDescription(
+      [
+        `📥 **تسجيل دخول**`,
+        `👤 <@${userId}>`,
+        `🕐 <t:${Math.floor(loginAt / 1000)}:T> — <t:${Math.floor(loginAt / 1000)}:D>`,
+      ].join('\n')
+    );
+
+  await channel.send({ embeds: [embed] }).catch(() => {});
+}
+
+async function sendLogoutLog(client, userId, logoutAt, sessionMinutes) {
+  const logChannelId = config.logChannelId;
+  if (!logChannelId) return;
+
+  let channel = client.channels.cache.get(logChannelId);
+  if (!channel) channel = await client.channels.fetch(logChannelId).catch(() => null);
+  if (!channel) return;
+
+  const embed = new EmbedBuilder()
+    .setColor(0xed4245)
+    .setDescription(
+      [
+        `📤 **تسجيل خروج**`,
+        `👤 <@${userId}>`,
+        `🕐 <t:${Math.floor(logoutAt / 1000)}:T> — <t:${Math.floor(logoutAt / 1000)}:D>`,
+        `⏱️ المدة: **${store.formatDuration(sessionMinutes)}**`,
+      ].join('\n')
+    );
+
+  await channel.send({ embeds: [embed] }).catch(() => {});
+}
+
+// ─── معالجات الأوامر ──────────────────────────────────────────
+
 async function handleAttendancePost(interaction) {
   if (!isAdmin(interaction.user.id, interaction.member)) {
-    await interaction.reply({
-      content: 'هذا الأمر للأدمن فقط.',
-      ephemeral: true,
-    });
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
     return;
   }
 
@@ -170,16 +214,12 @@ async function handleMyHours(interaction) {
 
 async function handleAdminCommand(interaction) {
   if (!isAdmin(interaction.user.id, interaction.member)) {
-    await interaction.reply({
-      content: 'هذا الأمر للأدمن فقط.',
-      ephemeral: true,
-    });
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
     return;
   }
 
   const sub = interaction.options.getSubcommand();
 
-  // لوحة العرض ما تحتاج defer لأنها سريعة
   if (sub === 'عرض') {
     await interaction.reply({
       embeds: [adminPanelEmbed()],
@@ -199,25 +239,18 @@ async function handleAdminCommand(interaction) {
 
   if (sub === 'تصفير-الكل') {
     store.resetAll();
-    await interaction.editReply({
-      content: 'تم تصفير ساعات الجميع لهذا الأسبوع.',
-    });
+    await interaction.editReply({ content: 'تم تصفير ساعات الجميع لهذا الأسبوع.' });
     return;
   }
 
   if (sub === 'استثناء-قائمة') {
     const ids = store.getExemptions();
     if (ids.length === 0) {
-      await interaction.editReply({
-        content: 'ما في أعضاء مستثنين حالياً.',
-      });
+      await interaction.editReply({ content: 'ما في أعضاء مستثنين حالياً.' });
       return;
     }
-
     const lines = ids.map((id) => `<@${id}>`).join('\n');
-    await interaction.editReply({
-      content: `المستثنين (${ids.length}):\n${lines}`,
-    });
+    await interaction.editReply({ content: `المستثنين (${ids.length}):\n${lines}` });
     return;
   }
 
@@ -226,29 +259,18 @@ async function handleAdminCommand(interaction) {
   if (sub === 'عضو') {
     const minutes = store.getWeeklyMinutes(user.id);
     const active = store.getActive(user.id);
-    const lines = [
-      `ساعات ${user}: **${store.formatDuration(minutes)}**`,
-    ];
-    if (active) {
-      lines.push(
-        `مسجل دخول حالياً منذ: ${discordTimestamp(active.loginAt)}`
-      );
-    }
-    await interaction.editReply({
-      content: lines.join('\n'),
-    });
+    const lines = [`ساعات ${user}: **${store.formatDuration(minutes)}**`];
+    if (active) lines.push(`مسجل دخول حالياً منذ: ${discordTimestamp(active.loginAt)}`);
+    await interaction.editReply({ content: lines.join('\n') });
     return;
   }
 
   if (sub === 'اخراج-عضو') {
     const result = store.logout(user.id);
     if (!result.ok) {
-      await interaction.editReply({
-        content: `${user} مو مسجل دخول حالياً.`,
-      });
+      await interaction.editReply({ content: `${user} مو مسجل دخول حالياً.` });
       return;
     }
-
     await interaction.editReply({
       content: [
         `تمت إزالة ${user} من المسجلين دخول.`,
@@ -261,25 +283,19 @@ async function handleAdminCommand(interaction) {
 
   if (sub === 'استثناء-عضو') {
     store.addExempt(user.id);
-    await interaction.editReply({
-      content: `تم استثناء ${user} من الإزالة التلقائية.`,
-    });
+    await interaction.editReply({ content: `تم استثناء ${user} من الإزالة التلقائية.` });
     return;
   }
 
   if (sub === 'الغاء-استثناء-عضو') {
     store.removeExempt(user.id);
-    await interaction.editReply({
-      content: `تم إلغاء استثناء ${user}.`,
-    });
+    await interaction.editReply({ content: `تم إلغاء استثناء ${user}.` });
     return;
   }
 
   if (sub === 'تصفير-عضو') {
     store.resetUser(user.id);
-    await interaction.editReply({
-      content: `تم تصفير ساعات ${user}.`,
-    });
+    await interaction.editReply({ content: `تم تصفير ساعات ${user}.` });
   }
 }
 
@@ -307,6 +323,9 @@ async function handleLogin(interaction) {
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
+
+  // إرسال لوق الدخول
+  await sendLoginLog(interaction.client, interaction.user.id, result.session.loginAt);
 }
 
 async function handleLogout(interaction) {
@@ -315,9 +334,7 @@ async function handleLogout(interaction) {
   const result = store.logout(interaction.user.id);
 
   if (!result.ok) {
-    await interaction.editReply({
-      content: 'أنت مو مسجل دخول حالياً.',
-    });
+    await interaction.editReply({ content: 'أنت مو مسجل دخول حالياً.' });
     return;
   }
 
@@ -336,6 +353,9 @@ async function handleLogout(interaction) {
     .setTimestamp();
 
   await interaction.editReply({ embeds: [embed] });
+
+  // إرسال لوق الخروج
+  await sendLogoutLog(interaction.client, interaction.user.id, result.logoutAt, result.sessionMinutes);
 }
 
 async function handleViewAttendance(interaction) {
@@ -349,13 +369,11 @@ async function handleViewAttendance(interaction) {
       .setTitle('📋 الحضور الحالي')
       .setDescription('> ما في أحد مسجل دخول حالياً.')
       .setTimestamp();
-
     await interaction.editReply({ embeds: [embed] });
     return;
   }
 
   const medals = ['🥇', '🥈', '🥉'];
-
   const lines = active.map((session, index) => {
     const medal = medals[index] || `**${index + 1}.**`;
     const duration = store.formatDuration(Math.floor((Date.now() - session.loginAt) / 60000));
@@ -374,10 +392,7 @@ async function handleViewAttendance(interaction) {
 
 async function handleAdminButton(interaction) {
   if (!isAdmin(interaction.user.id, interaction.member)) {
-    await interaction.reply({
-      content: 'هذا الزر للأدمن فقط.',
-      ephemeral: true,
-    });
+    await interaction.reply({ content: 'هذا الزر للأدمن فقط.', ephemeral: true });
     return;
   }
 
@@ -385,9 +400,7 @@ async function handleAdminButton(interaction) {
 
   if (interaction.customId === 'admin_reset_all') {
     store.resetAll();
-    await interaction.editReply({
-      content: 'تم تصفير ساعات الجميع لهذا الأسبوع.',
-    });
+    await interaction.editReply({ content: 'تم تصفير ساعات الجميع لهذا الأسبوع.' });
     return;
   }
 

@@ -19,6 +19,7 @@ const config = {
     .split(',')
     .map((id) => id.trim())
     .filter(Boolean),
+  logChannelId: process.env.LOG_CHANNEL_ID || '1532636572825030797',
 };
 
 module.exports = config;

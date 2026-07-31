@@ -160,7 +160,18 @@ function resetAll() {
   writeStore(data);
 }
 
-function getWarningChannelId() {
+// دالة لحفظ وجلب روم اللوق
+function getLogChannelId() {
+  const data = readStore();
+  return data.meta?.logChannelId || null;
+}
+
+function setLogChannelId(channelId) {
+  const data = readStore();
+  data.meta = data.meta || {};
+  data.meta.logChannelId = channelId || null;
+  writeStore(data);
+}
   const data = readStore();
   return data.meta?.warningChannelId || null;
 }
@@ -210,6 +221,8 @@ module.exports = {
   resetAll,
   getWarningChannelId,
   setWarningChannelId,
+  getLogChannelId,
+  setLogChannelId,
   isExempt,
   addExempt,
   removeExempt,
