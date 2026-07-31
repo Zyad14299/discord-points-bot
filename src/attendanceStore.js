@@ -172,6 +172,7 @@ function setLogChannelId(channelId) {
   data.meta.logChannelId = channelId || null;
   writeStore(data);
 }
+function getWarningChannelId() {
   const data = readStore();
   return data.meta?.warningChannelId || null;
 }
