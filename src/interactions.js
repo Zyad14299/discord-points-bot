@@ -410,6 +410,76 @@ async function handleAdminButton(interaction) {
   }
 }
 
+async function handleViolators(interaction) {
+  if (!isAdmin(interaction.user.id, interaction.member)) {
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const REQUIRED_MINUTES = 12 * 60; // 12 ساعة
+
+  // نجيب كل أعضاء السيرفر
+  let members;
+  try {
+    members = await interaction.guild.members.fetch();
+  } catch {
+    await interaction.editReply({ content: 'ما قدرت أجيب قائمة الأعضاء.' });
+    return;
+  }
+
+  const violators = [];
+
+  for (const [memberId, member] of members) {
+    // نتجاهل البوتات
+    if (member.user.bot) continue;
+
+    const minutes = store.getWeeklyMinutes(memberId);
+    if (minutes < REQUIRED_MINUTES) {
+      violators.push({
+        userId: memberId,
+        tag: member.user.tag,
+        minutes,
+      });
+    }
+  }
+
+  if (violators.length === 0) {
+    await interaction.editReply({ content: '✅ ما في مخالفين، الجميع تجاوز 12 ساعة!' });
+    return;
+  }
+
+  // ترتيب من الأقل للأكثر
+  violators.sort((a, b) => a.minutes - b.minutes);
+
+  const lines = violators.map((v, i) => {
+    const hours = store.formatDuration(v.minutes);
+    const hoursStr = v.minutes === 0 ? '**لم يسجل دخول**' : `**${hours}**`;
+    return `**${i + 1}.** <@${v.userId}> — ${hoursStr}`;
+  });
+
+  // Discord يحد الـ embed بـ 4096 حرف — نقسم لو كثير
+  const chunkSize = 30;
+  const chunks = [];
+  for (let i = 0; i < lines.length; i += chunkSize) {
+    chunks.push(lines.slice(i, i + chunkSize));
+  }
+
+  const { EmbedBuilder: EB } = require('discord.js');
+
+  const embeds = chunks.map((chunk, i) => {
+    return new EmbedBuilder()
+      .setColor(0xed4245)
+      .setTitle(i === 0 ? `⚠️ المخالفون — ساعات أقل من 12 ساعة (${violators.length} عضو)` : `⚠️ المخالفون (تابع)`)
+      .setDescription(chunk.join('\n'))
+      .setFooter({ text: `المطلوب: 12 ساعة أسبوعياً` })
+      .setTimestamp();
+  });
+
+  await interaction.editReply({ embeds: embeds.slice(0, 10) });
+}
+
 async function handleInteraction(interaction) {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'حضور') {
@@ -422,6 +492,10 @@ async function handleInteraction(interaction) {
     }
     if (interaction.commandName === 'لوحة') {
       await handleAdminCommand(interaction);
+      return;
+    }
+    if (interaction.commandName === 'مخالفين') {
+      await handleViolators(interaction);
       return;
     }
   }

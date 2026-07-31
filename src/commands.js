@@ -69,6 +69,11 @@ const commands = [
     .addSubcommand((sub) =>
       sub.setName('تصفير-الكل').setDescription('تصفير ساعات الجميع')
     ),
+  new SlashCommandBuilder()
+    .setName('مخالفين')
+    .setDescription('عرض الأعضاء الذين ساعاتهم أقل من 12 ساعة هذا الأسبوع')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
 ].map((command) => command.toJSON());
 
 module.exports = { commands };
