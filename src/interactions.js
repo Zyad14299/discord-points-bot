@@ -188,7 +188,7 @@ async function handleAttendancePost(interaction) {
 }
 
 async function handleMyHours(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const minutes = store.getWeeklyMinutes(interaction.user.id);
   const active = store.getActive(interaction.user.id);
@@ -229,7 +229,7 @@ async function handleAdminCommand(interaction) {
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   if (sub === 'الاسبوع') {
     const embed = await buildWeeklyEmbed(interaction.client);
@@ -300,7 +300,7 @@ async function handleAdminCommand(interaction) {
 }
 
 async function handleLogin(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const result = store.login(interaction.user.id);
 
@@ -329,7 +329,7 @@ async function handleLogin(interaction) {
 }
 
 async function handleLogout(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const result = store.logout(interaction.user.id);
 
@@ -359,7 +359,7 @@ async function handleLogout(interaction) {
 }
 
 async function handleViewAttendance(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const active = store.getAllActive();
 
@@ -396,7 +396,7 @@ async function handleAdminButton(interaction) {
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   if (interaction.customId === 'admin_reset_all') {
     store.resetAll();
@@ -416,7 +416,7 @@ async function handleViolators(interaction) {
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   const REQUIRED_MINUTES = 12 * 60; // 12 ساعة
 
