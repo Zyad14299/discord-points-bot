@@ -212,6 +212,19 @@ async function handleMyHours(interaction) {
   await interaction.editReply({ embeds: [embed] });
 }
 
+async function handleWarningChannel(interaction) {
+  if (!isAdmin(interaction.user.id, interaction.member)) {
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
+    return;
+  }
+
+  store.setWarningChannelId(interaction.channelId);
+  await interaction.reply({
+    content: `✅ تم تحديد هذا الروم (${interaction.channel}) كروم للتحذيرات التلقائية.`,
+    ephemeral: true,
+  });
+}
+
 async function handleAdminCommand(interaction) {
   if (!isAdmin(interaction.user.id, interaction.member)) {
     await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
@@ -484,6 +497,10 @@ async function handleInteraction(interaction) {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'حضور') {
       await handleAttendancePost(interaction);
+      return;
+    }
+    if (interaction.commandName === 'روم-التحذير') {
+      await handleWarningChannel(interaction);
       return;
     }
     if (interaction.commandName === 'ساعاتي') {

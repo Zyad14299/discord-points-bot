@@ -10,6 +10,11 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
+    .setName('روم-التحذير')
+    .setDescription('تحديد روم التحذير للنظام التلقائي')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  new SlashCommandBuilder()
     .setName('ساعاتي')
     .setDescription('عرض ساعات حضورك هذا الأسبوع'),
 

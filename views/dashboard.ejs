@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم - <%= botName %></title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar h1 {
+            color: white;
+            font-size: 24px;
+        }
+
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            color: #333;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .stat-card.active-users .value { color: #667eea; }
+        .stat-card.weekly-users .value { color: #f093fb; }
+        .stat-card.total-hours .value { color: #4facfe; }
+        .stat-card.exemptions .value { color: #43e97b; }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card h2 .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #219150;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.exempt {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            display: none;
+        }
+
+        .notification.success {
+            background: #27ae60;
+        }
+
+        .notification.error {
+            background: #e74c3c;
+        }
+
+        .notification.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -20px);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🔫 <%= botName %> - لوحة التحكم</h1>
+        <button class="logout-btn" onclick="logout()">تسجيل الخروج</button>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card active-users">
+                <h3>المستخدمون النشطون</h3>
+                <div class="value" id="activeUsers">-</div>
+            </div>
+            <div class="stat-card weekly-users">
+                <h3>المستخدمون هذا الأسبوع</h3>
+                <div class="value" id="weeklyUsers">-</div>
+            </div>
+            <div class="stat-card total-hours">
+                <h3>إجمالي الساعات</h3>
+                <div class="value" id="totalHours">-</div>
+            </div>
+            <div class="stat-card exemptions">
+                <h3>المستثنون</h3>
+                <div class="value" id="exemptions">-</div>
+            </div>
+        </div>
+
+        <div class="content-grid">
+            <div class="main-content">
+                <div class="card">
+                    <h2>
+                        المستخدمون النشطون
+                        <span class="status-badge active" id="systemStatus">النظام شغال</span>
+                    </h2>
+                    <div id="activeUsersContent">
+                        <div class="loading">جاري التحميل...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        الترتيب الأسبوعي
+                        <div class="actions">
+                            <button class="btn btn-primary btn-sm" onclick="loadLeaderboard()">تحديث</button>
+                        </div>
+                    </h2>
+                    <div id="leaderboardContent">
+                        <div class="loading">جاري التحميل...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="card">
+                    <h2>إدارة الاستثناءات</h2>
+                    <div class="input-group">
+                        <input type="text" id="exemptUserId" placeholder="معرف المستخدم">
+                        <button class="btn btn-success" onclick="addExemption()">إضافة</button>
+                    </div>
+                    <div id="exemptionsContent">
+                        <div class="loading">جاري التحميل...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>إجراءات سريعة</h2>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button class="btn btn-primary" onclick="showForceLogoutModal()">تسجيل خروج قسري</button>
+                        <button class="btn btn-danger" onclick="confirmResetAll()">تصفير ساعات الجميع</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>إعدادات النظام</h2>
+                    <div style="color: #666; font-size: 14px;">
+                        <p>مدة الغياب المسموحة: <strong id="absentHours">-</strong> ساعة</p>
+                        <p>فترة الفحص: <strong id="checkInterval">-</strong> دقيقة</p>
+                        <p>روم التحذير: <strong id="warningChannelStatus">-</strong></p>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                        <button class="btn btn-primary btn-sm" onclick="testConnection()">اختبار الاتصال</button>
+                        <div id="connectionTest" style="margin-top: 10px; font-size: 12px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        const API_BASE = '/api';
+        let password = localStorage.getItem('dashboardPassword') || sessionStorage.getItem('dashboardPassword');
+
+        // عرض معلومات التصحيح
+        console.log('حالة كلمة المرور عند تحميل الصفحة:');
+        console.log('localStorage:', localStorage.getItem('dashboardPassword'));
+        console.log('sessionStorage:', sessionStorage.getItem('dashboardPassword'));
+        console.log('القيمة النهائية:', password);
+
+        // التحقق من وجود كلمة المرور
+        if (!password) {
+            alert('يجب تسجيل الدخول أولاً - كلمة المرور غير موجودة');
+            window.location.href = '/';
+        }
+
+        function getHeaders() {
+            console.log('إعداد headers، كلمة المرور:', password ? 'موجودة' : 'غير موجودة');
+            return {
+                'Authorization': password || '',
+                'Content-Type': 'application/json'
+            };
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        async function apiCall(endpoint, options = {}) {
+            const headers = getHeaders();
+            console.log('إرسال طلب إلى:', endpoint, 'مع headers:', headers);
+
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                ...options,
+                headers: headers
+            });
+
+            console.log('استجابة:', response.status);
+
+            if (response.status === 401) {
+                localStorage.removeItem('dashboardPassword');
+                window.location.href = '/';
+                return null;
+            }
+
+            return response.json();
+        }
+
+        async function loadStats() {
+            const stats = await apiCall('/stats');
+            if (stats) {
+                document.getElementById('activeUsers').textContent = stats.activeUsers;
+                document.getElementById('weeklyUsers').textContent = stats.totalWeeklyUsers;
+                document.getElementById('totalHours').textContent = Math.floor(stats.totalWeeklyMinutes / 60);
+                document.getElementById('exemptions').textContent = stats.exemptionsCount;
+                document.getElementById('absentHours').textContent = stats.absentHours;
+                document.getElementById('checkInterval').textContent = stats.checkInterval;
+                document.getElementById('warningChannelStatus').textContent = stats.warningChannelSet ? 'مُحدد ✓' : 'غير مُحدد ✗';
+            }
+        }
+
+        async function loadActiveUsers() {
+            const users = await apiCall('/active-users');
+            if (users) {
+                const container = document.getElementById('activeUsersContent');
+                if (users.length === 0) {
+                    container.innerHTML = '<div class="empty-state">لا يوجد مستخدمين نشطين حالياً</div>';
+                    return;
+                }
+
+                let html = '<table><thead><tr><th>المستخدم</th><th>وقت الدخول</th><th>المدة</th><th>إجراء</th></tr></thead><tbody>';
+                users.forEach(user => {
+                    html += `
+                        <tr>
+                            <td><@${user.userId}></td>
+                            <td>${user.loginTime}</td>
+                            <td>${user.durationMinutes} دقيقة</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm" onclick="forceLogout('${user.userId}')">خروج</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+        }
+
+        async function loadLeaderboard() {
+            const leaderboard = await apiCall('/leaderboard');
+            if (leaderboard) {
+                const container = document.getElementById('leaderboardContent');
+                if (leaderboard.length === 0) {
+                    container.innerHTML = '<div class="empty-state">لا يوجد بيانات هذا الأسبوع</div>';
+                    return;
+                }
+
+                let html = '<table><thead><tr><th>الترتيب</th><th>المستخدم</th><th>الساعات</th></tr></thead><tbody>';
+                leaderboard.forEach(entry => {
+                    html += `
+                        <tr>
+                            <td>#${entry.rank}</td>
+                            <td><@${entry.userId}></td>
+                            <td>${entry.formattedDuration}</td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+        }
+
+        async function loadExemptions() {
+            const exemptions = await apiCall('/exemptions');
+            if (exemptions) {
+                const container = document.getElementById('exemptionsContent');
+                if (exemptions.length === 0) {
+                    container.innerHTML = '<div class="empty-state">لا يوجد مستثنين</div>';
+                    return;
+                }
+
+                let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                exemptions.forEach(userId => {
+                    html += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f8f9fa; border-radius: 8px;">
+                            <span><@${userId}></span>
+                            <button class="btn btn-danger btn-sm" onclick="removeExemption('${userId}')">إزالة</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+        }
+
+        async function addExemption() {
+            const userId = document.getElementById('exemptUserId').value.trim();
+            if (!userId) {
+                showNotification('يرجى إدخال معرف المستخدم', 'error');
+                return;
+            }
+
+            const result = await apiCall('/exemptions', {
+                method: 'POST',
+                body: JSON.stringify({ userId })
+            });
+
+            if (result && result.success) {
+                showNotification('تم إضافة الاستثناء بنجاح');
+                document.getElementById('exemptUserId').value = '';
+                loadExemptions();
+                loadStats();
+            }
+        }
+
+        async function removeExemption(userId) {
+            const result = await apiCall(`/exemptions/${userId}`, {
+                method: 'DELETE'
+            });
+
+            if (result && result.success) {
+                showNotification('تم إزالة الاستثناء بنجاح');
+                loadExemptions();
+                loadStats();
+            }
+        }
+
+        async function forceLogout(userId) {
+            if (!confirm('هل أنت متأكد من تسجيل خروج هذا المستخدم؟')) {
+                return;
+            }
+
+            const result = await apiCall('/force-logout', {
+                method: 'POST',
+                body: JSON.stringify({ userId })
+            });
+
+            if (result && result.success) {
+                showNotification('تم تسجيل الخروج بنجاح');
+                loadActiveUsers();
+                loadStats();
+            }
+        }
+
+        function showForceLogoutModal() {
+            const userId = prompt('أدخل معرف المستخدم:');
+            if (userId) {
+                forceLogout(userId);
+            }
+        }
+
+        async function confirmResetAll() {
+            if (!confirm('هل أنت متأكد من تصفير ساعات الجميع؟ هذا الإجراء لا يمكن التراجع عنه!')) {
+                return;
+            }
+
+            const result = await apiCall('/reset-all', {
+                method: 'POST'
+            });
+
+            if (result && result.success) {
+                showNotification('تم تصفير ساعات الجميع بنجاح');
+                loadLeaderboard();
+                loadStats();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('dashboardPassword');
+            sessionStorage.removeItem('dashboardPassword');
+            window.location.href = '/';
+        }
+
+        async function testConnection() {
+            const testDiv = document.getElementById('connectionTest');
+            testDiv.innerHTML = 'جاري الاختبار...';
+
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: getHeaders()
+                });
+
+                console.log('اختبار الاتصال - حالة:', response.status);
+
+                if (response.ok) {
+                    testDiv.innerHTML = '✅ الاتصال يعمل بشكل صحيح';
+                    testDiv.style.color = 'green';
+                } else {
+                    const error = await response.json();
+                    testDiv.innerHTML = `❌ خطأ: ${error.error || response.status}`;
+                    testDiv.style.color = 'red';
+                }
+            } catch (error) {
+                console.error('خطأ في الاختبار:', error);
+                testDiv.innerHTML = `❌ خطأ في الاتصال: ${error.message}`;
+                testDiv.style.color = 'red';
+            }
+        }
+
+        // تحميل البيانات عند فتح الصفحة
+        loadStats();
+        loadActiveUsers();
+        loadLeaderboard();
+        loadExemptions();
+
+        // تحديث تلقائي كل 30 ثانية
+        setInterval(() => {
+            loadStats();
+            loadActiveUsers();
+        }, 30000);
+    </script>
+</body>
+</html>

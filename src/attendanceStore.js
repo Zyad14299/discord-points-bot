@@ -17,6 +17,7 @@ function ensureStore() {
           weekly: {},
           meta: { warningChannelId: null },
           exceptions: {},
+          voiceData: { lastVoiceSeenAt: {}, isInVoice: {} },
         },
         null,
         2
@@ -42,6 +43,10 @@ function readStore() {
         data.exceptions && typeof data.exceptions === 'object'
           ? data.exceptions
           : {},
+      voiceData:
+        data.voiceData && typeof data.voiceData === 'object'
+          ? data.voiceData
+          : { lastVoiceSeenAt: {}, isInVoice: {} },
     };
   } catch {
     return {
@@ -49,6 +54,7 @@ function readStore() {
       weekly: {},
       meta: { warningChannelId: null },
       exceptions: {},
+      voiceData: { lastVoiceSeenAt: {}, isInVoice: {} },
     };
   }
 }
@@ -209,6 +215,32 @@ function getExemptions() {
   return Object.keys(data.exceptions || {});
 }
 
+// دوال لحفظ بيانات الرومات الصوتية
+function getVoiceData() {
+  const data = readStore();
+  return {
+    lastVoiceSeenAt: data.voiceData?.lastVoiceSeenAt || {},
+    isInVoice: data.voiceData?.isInVoice || {},
+  };
+}
+
+function setVoiceData(userId, lastSeen, inVoice) {
+  const data = readStore();
+  data.voiceData = data.voiceData || { lastVoiceSeenAt: {}, isInVoice: {} };
+  data.voiceData.lastVoiceSeenAt[userId] = lastSeen;
+  data.voiceData.isInVoice[userId] = inVoice;
+  writeStore(data);
+}
+
+function clearVoiceData(userId) {
+  const data = readStore();
+  if (data.voiceData) {
+    delete data.voiceData.lastVoiceSeenAt[userId];
+    delete data.voiceData.isInVoice[userId];
+    writeStore(data);
+  }
+}
+
 module.exports = {
   formatDuration,
   getActive,
@@ -228,4 +260,7 @@ module.exports = {
   addExempt,
   removeExempt,
   getExemptions,
+  getVoiceData,
+  setVoiceData,
+  clearVoiceData,
 };

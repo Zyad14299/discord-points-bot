@@ -27,9 +27,24 @@ const client = new Client({
 const lastVoiceSeenAt = new Map(); // userId -> timestamp ms
 const isInVoice = new Map(); // userId -> boolean
 
+// تحميل البيانات المحفوظة من الملف
+function loadVoiceData() {
+  const voiceData = attendanceStore.getVoiceData();
+  for (const [userId, timestamp] of Object.entries(voiceData.lastVoiceSeenAt)) {
+    lastVoiceSeenAt.set(userId, timestamp);
+  }
+  for (const [userId, inVoice] of Object.entries(voiceData.isInVoice)) {
+    isInVoice.set(userId, inVoice);
+  }
+  console.log(`تم تحميل بيانات ${lastVoiceSeenAt.size} عضو من الرومات الصوتية.`);
+}
+
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`البوت شغال باسم: ${readyClient.user.tag}`);
   console.log('نظام تسجيل الحضور + الموسيقى جاهز.');
+
+  // تحميل البيانات المحفوظة
+  loadVoiceData();
 
   // نمسح كل الرومات الصوتية الحالية عند البدء عشان نعرف مين موجود
   try {
@@ -38,6 +53,8 @@ client.once(Events.ClientReady, (readyClient) => {
         if (voiceState.channelId) {
           isInVoice.set(memberId, true);
           lastVoiceSeenAt.set(memberId, Date.now());
+          // حفظ البيانات المحدثة
+          attendanceStore.setVoiceData(memberId, Date.now(), true);
         }
       }
     }
@@ -91,6 +108,11 @@ client.once(Events.ClientReady, (readyClient) => {
 
       const result = attendanceStore.forceLogoutWithoutCounting(userId);
       if (!result.ok) continue;
+
+      // مسح بيانات الرومات الصوتية للعضو المُخرج
+      attendanceStore.clearVoiceData(userId);
+      isInVoice.delete(userId);
+      lastVoiceSeenAt.delete(userId);
 
       // حساب مدة الغياب بالساعات والدقائق
       const absentMinutes = Math.floor(absentFor / 60000);
@@ -155,9 +177,13 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     if (channelId) {
       isInVoice.set(memberId, true);
       lastVoiceSeenAt.set(memberId, Date.now());
+      // حفظ البيانات المحدثة
+      attendanceStore.setVoiceData(memberId, Date.now(), true);
     } else {
       isInVoice.set(memberId, false);
       lastVoiceSeenAt.set(memberId, Date.now());
+      // حفظ البيانات المحدثة
+      attendanceStore.setVoiceData(memberId, Date.now(), false);
     }
   } catch {
     // ignore
