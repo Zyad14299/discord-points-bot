@@ -15,7 +15,11 @@ function ensureStore() {
         {
           active: {},
           weekly: {},
-          meta: { warningChannelId: null },
+          meta: {
+            warningChannelId: null,
+            moveLogChannelId: null,
+            moveLogEnabled: false
+          },
           exceptions: {},
           voiceData: { lastVoiceSeenAt: {}, isInVoice: {} },
         },
@@ -38,7 +42,7 @@ function readStore() {
       meta:
         data.meta && typeof data.meta === 'object'
           ? data.meta
-          : { warningChannelId: null },
+          : { warningChannelId: null, moveLogChannelId: null, moveLogEnabled: false },
       exceptions:
         data.exceptions && typeof data.exceptions === 'object'
           ? data.exceptions
@@ -52,7 +56,7 @@ function readStore() {
     return {
       active: {},
       weekly: {},
-      meta: { warningChannelId: null },
+      meta: { warningChannelId: null, moveLogChannelId: null, moveLogEnabled: false },
       exceptions: {},
       voiceData: { lastVoiceSeenAt: {}, isInVoice: {} },
     };
@@ -241,6 +245,30 @@ function clearVoiceData(userId) {
   }
 }
 
+// ─── دوال تتبع الساعات الصوتية ───────────────────────────────
+
+function addVoiceMinutes(userId, minutes) {
+  const data = readStore();
+  data.voiceMinutes = data.voiceMinutes || {};
+  const prev = Number(data.voiceMinutes[userId] || 0);
+  data.voiceMinutes[userId] = prev + minutes;
+  writeStore(data);
+}
+
+function getVoiceMinutes(userId) {
+  const data = readStore();
+  return Number(data.voiceMinutes?.[userId] || 0);
+}
+
+function getVoiceLeaderboard() {
+  const data = readStore();
+  return Object.entries(data.voiceMinutes || {})
+    .map(([userId, mins]) => ({ userId, totalMinutes: Number(mins) || 0 }))
+    .filter((e) => e.totalMinutes > 0)
+    .sort((a, b) => b.totalMinutes - a.totalMinutes)
+    .slice(0, 5);
+}
+
 module.exports = {
   formatDuration,
   getActive,
@@ -263,4 +291,7 @@ module.exports = {
   getVoiceData,
   setVoiceData,
   clearVoiceData,
+  addVoiceMinutes,
+  getVoiceMinutes,
+  getVoiceLeaderboard,
 };

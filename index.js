@@ -10,6 +10,12 @@ const config = require('./src/config');
 const { handleInteraction } = require('./src/interactions');
 const { handleMusicMessage } = require('./src/musicCommands');
 const attendanceStore = require('./src/attendanceStore');
+const {
+  handleVoiceStateForSystems,
+  startAfkChecker,
+  startVoiceLeaderboard,
+  handleAuditLog,
+} = require('./src/voiceSystems');
 
 const client = new Client({
   intents: [
@@ -18,6 +24,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildModeration,
   ],
   partials: [Partials.Channel],
 });
@@ -71,6 +78,13 @@ client.once(Events.ClientReady, (readyClient) => {
       config.absentHours
     } ساعة (فحص كل ${config.absentCheckIntervalMinutes} دقيقة).`
   );
+
+  // ─── تشغيل الأنظمة الجديدة ───
+  startAfkChecker(client);
+  console.log(`[AFK] نظام AFK شغال — نقل بعد ${config.afkDeafenMinutes} دقيقة دفن`);
+  startVoiceLeaderboard(client);
+  console.log(`[Leaderboard] لوحة الساعات الصوتية شغالة في قناة "${config.voiceLeaderboardChannelName}"`);
+  console.log(`[ModLog] لوقات المودريشن تنزل في قناة "${config.modLogChannelName}"`);
 
   setInterval(async () => {
     if (absentMs <= 0) return;
@@ -177,16 +191,26 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
     if (channelId) {
       isInVoice.set(memberId, true);
       lastVoiceSeenAt.set(memberId, Date.now());
-      // حفظ البيانات المحدثة
       attendanceStore.setVoiceData(memberId, Date.now(), true);
     } else {
       isInVoice.set(memberId, false);
       lastVoiceSeenAt.set(memberId, Date.now());
-      // حفظ البيانات المحدثة
       attendanceStore.setVoiceData(memberId, Date.now(), false);
     }
+
+    // نظام AFK + تتبع الساعات الصوتية
+    handleVoiceStateForSystems(oldState, newState, client);
   } catch {
     // ignore
+  }
+});
+
+// ─── لوقات المودريشن ──────────────────────────────────────────
+client.on(Events.GuildAuditLogEntryCreate, async (entry, guild) => {
+  try {
+    await handleAuditLog(entry, guild);
+  } catch (e) {
+    console.error('[ModLog] خطأ:', e.message);
   }
 });
 
