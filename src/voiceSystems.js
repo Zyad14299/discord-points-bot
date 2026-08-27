@@ -96,7 +96,7 @@ function handleVoiceStateForSystems(oldState, newState, client) {
 function startAfkChecker(client) {
   setInterval(async () => {
     const now = Date.now();
-    const limitMs = config.afkDeafenMinutes * 60 * 1000;
+    const limitMs = 30 * 1000; // 30 ثانية ثابتة
 
     for (const guild of client.guilds.cache.values()) {
       const afkChannel = findVoiceChannelByName(guild, config.afkChannelName);
@@ -134,7 +134,7 @@ function startAfkChecker(client) {
         }
       }
     }
-  }, 60 * 1000); // فحص كل دقيقة
+  }, 10 * 1000); // فحص كل 10 ثواني
 }
 
 // ─── ٢. لوحة الساعات الصوتية ─────────────────────────────────
@@ -253,10 +253,8 @@ async function updateVoiceLeaderboard(client) {
 }
 
 function startVoiceLeaderboard(client) {
-  // أول تحديث بعد 5 ثواني من البدء
+  // ننشر مرة وحدة فقط عند البدء
   setTimeout(() => updateVoiceLeaderboard(client), 5000);
-  // ثم كل 30 ثانية
-  setInterval(() => updateVoiceLeaderboard(client), 30 * 1000);
 }
 
 // ─── ٣. لوقات المودريشن ──────────────────────────────────────

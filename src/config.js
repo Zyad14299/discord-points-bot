@@ -23,7 +23,7 @@ const config = {
 
   // نظام AFK — اسم روم الـ AFK
   afkChannelName: process.env.AFK_CHANNEL_NAME || 'AFK',
-  // مدة الدفن قبل النقل (بالدقائق)
+  // افتراضي 30 ثانية للـ AFK
   afkDeafenMinutes: Math.max(1, Number(process.env.AFK_DEAFEN_MINUTES || 30)) || 30,
 
   // لوحة الساعات الصوتية
