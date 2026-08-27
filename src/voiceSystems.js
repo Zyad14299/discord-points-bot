@@ -159,24 +159,34 @@ function buildProgressBar(minutes, maxMinutes) {
 }
 
 async function buildVoiceLeaderboardEmbed(client, guild) {
-  // نضيف الوقت الحالي للأشخاص اللي في الروم الحين
   const now = Date.now();
-  const top = attendanceStore.getVoiceLeaderboard();
 
-  // نضيف الوقت الحالي للجلسات النشطة
-  for (const session of voiceSessions.values()) {
+  // نجيب الساعات المحفوظة
+  const savedData = attendanceStore.getVoiceLeaderboard();
+  const minutesMap = new Map();
+  for (const entry of savedData) {
+    minutesMap.set(entry.userId, { totalMinutes: entry.totalMinutes, live: false });
+  }
+
+  // نضيف الوقت الحي لكل شخص في روم الحين
+  for (const [userId, session] of voiceSessions) {
     const liveMinutes = Math.floor((now - session.joinedAt) / 60000);
-    if (liveMinutes > 0) {
-      const existing = top.find(e => e.userId === session.userId);
-      if (existing) {
-        existing.totalMinutes += liveMinutes;
-        existing.live = true;
-      }
+    if (liveMinutes <= 0) continue;
+    const existing = minutesMap.get(userId);
+    if (existing) {
+      existing.totalMinutes += liveMinutes;
+      existing.live = true;
+    } else {
+      minutesMap.set(userId, { totalMinutes: liveMinutes, live: true });
     }
   }
 
-  // نعيد الترتيب بعد إضافة الوقت الحي
-  top.sort((a, b) => b.totalMinutes - a.totalMinutes);
+  // نرتب ونأخذ Top 5
+  const top = [...minutesMap.entries()]
+    .map(([userId, data]) => ({ userId, ...data }))
+    .filter(e => e.totalMinutes > 0)
+    .sort((a, b) => b.totalMinutes - a.totalMinutes)
+    .slice(0, 5);
 
   const maxMinutes = top.length > 0 ? top[0].totalMinutes : 1;
 
@@ -198,7 +208,7 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
   }
 
   const lines = await Promise.all(
-    top.slice(0, 5).map(async (entry, i) => {
+    top.map(async (entry, i) => {
       const style = RANK_STYLES[i];
       let display = `<@${entry.userId}>`;
       try {
@@ -215,7 +225,7 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
       const liveIndicator = entry.live ? ' 🔴' : '';
 
       return [
-        `${style.emoji} **المركز ${style.label}** ${liveIndicator}`,
+        `${style.emoji} **المركز ${style.label}**${liveIndicator}`,
         `┣ ${display}`,
         `┣ \`${bar}\``,
         `┗ ⏱️ **${timeStr}**`,
