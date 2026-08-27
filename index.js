@@ -12,6 +12,7 @@ const { handleMusicMessage } = require('./src/musicCommands');
 const attendanceStore = require('./src/attendanceStore');
 const {
   handleVoiceStateForSystems,
+  initVoiceSessions,
   startAfkChecker,
   startVoiceLeaderboard,
   handleAuditLog,
@@ -80,6 +81,7 @@ client.once(Events.ClientReady, (readyClient) => {
   );
 
   // ─── تشغيل الأنظمة الجديدة ───
+  initVoiceSessions(readyClient);
   startAfkChecker(client);
   console.log(`[AFK] نظام AFK شغال — نقل بعد ${config.afkDeafenMinutes} دقيقة دفن`);
   startVoiceLeaderboard(client);

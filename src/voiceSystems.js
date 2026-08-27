@@ -26,14 +26,11 @@ function findVoiceChannelByName(guild, name) {
 
 // ─── ١. نظام AFK ─────────────────────────────────────────────
 
-// Map: userId -> { joinedAt, isDeafened, deafenedAt }
+// Map: userId -> { joinedAt, channelId, deafenedAt?, userId, live? }
 const voiceSessions = new Map();
 
 /**
  * يُستدعى عند كل VoiceStateUpdate
- * يتتبع:
- *  - وقت الدخول/الخروج لحساب الساعات
- *  - وقت بداية الصم للـ AFK
  */
 function handleVoiceStateForSystems(oldState, newState, client) {
   const userId = newState?.member?.id || oldState?.member?.id;
@@ -48,8 +45,13 @@ function handleVoiceStateForSystems(oldState, newState, client) {
 
   // ─── تتبع الوقت الصوتي ───
   if (!oldChannel && newChannel) {
-    // دخل روم
-    voiceSessions.set(userId, { joinedAt: now, channelId: newChannel });
+    // دخل روم جديد
+    voiceSessions.set(userId, {
+      userId,
+      joinedAt: now,
+      channelId: newChannel,
+      deafenedAt: (newState?.selfDeaf || newState?.serverDeaf) ? now : undefined,
+    });
   } else if (oldChannel && !newChannel) {
     // طلع من الروم
     const session = voiceSessions.get(userId);
@@ -59,28 +61,31 @@ function handleVoiceStateForSystems(oldState, newState, client) {
       voiceSessions.delete(userId);
     }
   } else if (oldChannel && newChannel && oldChannel !== newChannel) {
-    // انتقل لروم ثاني — نحسب وقت الروم السابق ونبدأ جديد
+    // انتقل لروم ثاني
     const session = voiceSessions.get(userId);
     if (session) {
       const minutes = Math.floor((now - session.joinedAt) / 60000);
       if (minutes > 0) attendanceStore.addVoiceMinutes(userId, minutes);
     }
-    voiceSessions.set(userId, { joinedAt: now, channelId: newChannel });
-  }
+    voiceSessions.set(userId, {
+      userId,
+      joinedAt: now,
+      channelId: newChannel,
+      deafenedAt: (newState?.selfDeaf || newState?.serverDeaf) ? now : undefined,
+    });
+  } else if (oldChannel && newChannel && oldChannel === newChannel) {
+    // نفس الروم — تغيير حالة (mute/deaf)
+    const session = voiceSessions.get(userId);
+    if (!session) return;
 
-  // ─── تتبع الصم للـ AFK ───
-  const session = voiceSessions.get(userId);
-  if (!session) return;
+    const wasDeafened = oldState?.selfDeaf || oldState?.serverDeaf;
+    const isDeafened = newState?.selfDeaf || newState?.serverDeaf;
 
-  const wasDeafened = oldState?.selfDeaf || oldState?.serverDeaf;
-  const isDeafened = newState?.selfDeaf || newState?.serverDeaf;
-
-  if (!wasDeafened && isDeafened) {
-    // بدأ يكون مدفون
-    session.deafenedAt = now;
-  } else if (wasDeafened && !isDeafened) {
-    // رفع الصم
-    delete session.deafenedAt;
+    if (!wasDeafened && isDeafened) {
+      session.deafenedAt = now;
+    } else if (wasDeafened && !isDeafened) {
+      delete session.deafenedAt;
+    }
   }
 }
 
@@ -138,43 +143,89 @@ function startAfkChecker(client) {
 let leaderboardMessageId = null;
 let leaderboardChannelId = null;
 
-const MEDALS = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+const RANK_STYLES = [
+  { emoji: '👑', label: 'الأول',  color: 0xFFD700 },
+  { emoji: '🥈', label: 'الثاني', color: 0xC0C0C0 },
+  { emoji: '🥉', label: 'الثالث', color: 0xCD7F32 },
+  { emoji: '4️⃣', label: 'الرابع', color: 0x5865f2 },
+  { emoji: '5️⃣', label: 'الخامس', color: 0x5865f2 },
+];
+
+function buildProgressBar(minutes, maxMinutes) {
+  const total = 10;
+  const filled = maxMinutes > 0 ? Math.round((minutes / maxMinutes) * total) : 0;
+  const empty = total - filled;
+  return '█'.repeat(filled) + '░'.repeat(empty);
+}
 
 async function buildVoiceLeaderboardEmbed(client, guild) {
+  // نضيف الوقت الحالي للأشخاص اللي في الروم الحين
+  const now = Date.now();
   const top = attendanceStore.getVoiceLeaderboard();
 
+  // نضيف الوقت الحالي للجلسات النشطة
+  for (const session of voiceSessions.values()) {
+    const liveMinutes = Math.floor((now - session.joinedAt) / 60000);
+    if (liveMinutes > 0) {
+      const existing = top.find(e => e.userId === session.userId);
+      if (existing) {
+        existing.totalMinutes += liveMinutes;
+        existing.live = true;
+      }
+    }
+  }
+
+  // نعيد الترتيب بعد إضافة الوقت الحي
+  top.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+  const maxMinutes = top.length > 0 ? top[0].totalMinutes : 1;
+
   const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('🎙️ لوحة الساعات الصوتية')
+    .setColor(0x2b2d31)
+    .setTitle('━━━━━━━━━━━━━━━━━━━━━━\n🎙️  لوحة الساعات الصوتية\n━━━━━━━━━━━━━━━━━━━━━━')
     .setTimestamp();
 
   if (top.length === 0) {
-    embed.setDescription('> ما في ساعات مسجلة بعد.');
+    embed
+      .setDescription(
+        '```\n' +
+        '  ما في أحد سجّل ساعات بعد\n' +
+        '  ادخل أي روم صوتي تبدأ العداد\n' +
+        '```'
+      )
+      .setFooter({ text: '🔄 تتحدث كل 30 ثانية' });
     return embed;
   }
 
   const lines = await Promise.all(
-    top.map(async (entry, i) => {
-      const medal = MEDALS[i] || `**${i + 1}.**`;
+    top.slice(0, 5).map(async (entry, i) => {
+      const style = RANK_STYLES[i];
       let display = `<@${entry.userId}>`;
       try {
-        const member = await guild.members.fetch(entry.userId);
-        display = `<@${entry.userId}>`;
-      } catch {
-        // نبقى بالمنشن
-      }
+        await guild.members.fetch(entry.userId);
+      } catch { /* نبقى بالمنشن */ }
+
       const hours = Math.floor(entry.totalMinutes / 60);
       const mins = entry.totalMinutes % 60;
-      const timeStr = mins > 0
-        ? `**${hours}س ${mins}د**`
-        : `**${hours} ساعة**`;
-      return `${medal} ${display} — ${timeStr}`;
+      const timeStr = hours > 0
+        ? `${hours}س ${mins > 0 ? mins + 'د' : ''}`
+        : `${mins}د`;
+
+      const bar = buildProgressBar(entry.totalMinutes, maxMinutes);
+      const liveIndicator = entry.live ? ' 🔴' : '';
+
+      return [
+        `${style.emoji} **المركز ${style.label}** ${liveIndicator}`,
+        `┣ ${display}`,
+        `┣ \`${bar}\``,
+        `┗ ⏱️ **${timeStr}**`,
+      ].join('\n');
     })
   );
 
   embed
     .setDescription(lines.join('\n\n'))
-    .setFooter({ text: '🔄 تتحدث كل 30 ثانية' });
+    .setFooter({ text: '🔴 = في روم الآن  •  🔄 تتحدث كل 30 ثانية' });
 
   return embed;
 }
@@ -387,8 +438,30 @@ async function handleAuditLog(entry, guild) {
   }
 }
 
+/**
+ * يُستدعى عند ClientReady لتسجيل من هو في الرومات الحين
+ */
+function initVoiceSessions(client) {
+  const now = Date.now();
+  for (const guild of client.guilds.cache.values()) {
+    for (const [, voiceState] of guild.voiceStates.cache) {
+      if (!voiceState.channelId) continue;
+      if (voiceState.member?.user?.bot) continue;
+      const userId = voiceState.id;
+      voiceSessions.set(userId, {
+        userId,
+        joinedAt: now,
+        channelId: voiceState.channelId,
+        deafenedAt: (voiceState.selfDeaf || voiceState.serverDeaf) ? now : undefined,
+      });
+    }
+  }
+  console.log(`[VoiceSessions] تم تسجيل ${voiceSessions.size} شخص في الرومات عند البدء`);
+}
+
 module.exports = {
   handleVoiceStateForSystems,
+  initVoiceSessions,
   startAfkChecker,
   startVoiceLeaderboard,
   handleAuditLog,
