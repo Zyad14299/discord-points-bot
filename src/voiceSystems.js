@@ -96,48 +96,60 @@ function handleVoiceStateForSystems(oldState, newState, client) {
 function startAfkChecker(client) {
   setInterval(async () => {
     const now = Date.now();
-    const limitMs = 30 * 1000; // 30 ثانية ثابتة
+    const limitMs = 30 * 1000; // 30 ثانية
 
-    for (const [userId, session] of voiceSessions) {
-      if (!session.deafenedAt) continue;
-      const deafDuration = now - session.deafenedAt;
-      if (deafDuration < limitMs) continue;
+    for (const guild of client.guilds.cache.values()) {
+      const afkChannel = findVoiceChannelByName(guild, config.afkChannelName);
+      if (!afkChannel) continue;
 
-      // نفحص في كل guild
-      for (const guild of client.guilds.cache.values()) {
-        const afkChannel = findVoiceChannelByName(guild, config.afkChannelName);
-        if (!afkChannel) continue;
+      // نفحص كل شخص في أي روم صوتي مباشرة
+      for (const [, voiceState] of guild.voiceStates.cache) {
+        if (!voiceState.channelId) continue;
+        if (voiceState.member?.user?.bot) continue;
+        if (voiceState.channelId === afkChannel.id) continue;
 
-        let member;
-        try {
-          member = await guild.members.fetch(userId);
-        } catch {
+        const userId = voiceState.id;
+        const isDeaf = voiceState.selfDeaf || voiceState.serverDeaf;
+
+        if (!isDeaf) {
+          // مو مدفون — نمسح وقت الدفن لو كان موجود
+          const session = voiceSessions.get(userId);
+          if (session) delete session.deafenedAt;
           continue;
         }
 
-        if (!member.voice?.channelId) continue;
-        if (member.voice.channelId === afkChannel.id) {
-          // هو أصلاً في AFK — نجدد deafenedAt عشان ما يتكرر الفحص
+        // مدفون — نسجل وقت البدء لو ما سجلنا
+        const session = voiceSessions.get(userId);
+        if (!session) continue;
+
+        if (!session.deafenedAt) {
           session.deafenedAt = now;
           continue;
         }
 
+        // نشوف قديش صار مدفون
+        if (now - session.deafenedAt < limitMs) continue;
+
+        // ننقله لـ AFK
         try {
-          await member.voice.setChannel(afkChannel, `Deafened for 30+ seconds`);
+          const member = voiceState.member || await guild.members.fetch(userId).catch(() => null);
+          if (!member) continue;
+
+          await member.voice.setChannel(afkChannel, 'Deafened for 30+ seconds');
           console.log(`[AFK] نقل ${userId} لروم AFK`);
-          // نحسب وقته في الروم السابق
+
           const minutes = Math.floor((now - session.joinedAt) / 60000);
           if (minutes > 0) attendanceStore.addVoiceMinutes(userId, minutes);
-          // نبدأ جلسة جديدة
+
           session.joinedAt = now;
           session.channelId = afkChannel.id;
-          session.deafenedAt = now;
+          session.deafenedAt = now; // نجدد عشان ما ينقل مرة ثانية فور
         } catch (e) {
           console.error(`[AFK] فشل نقل ${userId}:`, e.message);
         }
       }
     }
-  }, 10 * 1000); // فحص كل 10 ثواني
+  }, 10 * 1000);
 }
 
 // ─── ٢. لوحة الساعات الصوتية ─────────────────────────────────
