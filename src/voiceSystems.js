@@ -57,9 +57,14 @@ function handleVoiceStateForSystems(oldState, newState, client) {
     const session = voiceSessions.get(userId);
     if (session) {
       const seconds = Math.floor((now - session.joinedAt) / 1000);
-      const minutes = Math.max(1, Math.floor(seconds / 60)); // دقيقة على الأقل لو جلس أكثر من 30 ثانية
+      const minutes = Math.max(1, Math.floor(seconds / 60));
+      console.log(`[Voice] ${userId} طلع من الروم — جلس ${seconds}ث = ${minutes}د — نحفظ`);
       if (seconds >= 30) attendanceStore.addVoiceMinutes(userId, minutes);
+      const totalNow = attendanceStore.getVoiceMinutes(userId);
+      console.log(`[Voice] ${userId} إجمالي الوقت المحفوظ = ${totalNow}د`);
       voiceSessions.delete(userId);
+    } else {
+      console.log(`[Voice] ${userId} طلع لكن ما في session محفوظة`);
     }
   } else if (oldChannel && newChannel && oldChannel !== newChannel) {
     // انتقل لروم ثاني — نحفظ وقت الروم السابق
