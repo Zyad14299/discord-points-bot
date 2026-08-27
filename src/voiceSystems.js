@@ -53,18 +53,20 @@ function handleVoiceStateForSystems(oldState, newState, client) {
       deafenedAt: (newState?.selfDeaf || newState?.serverDeaf) ? now : undefined,
     });
   } else if (oldChannel && !newChannel) {
-    // طلع من الروم
+    // طلع من الروم — نحفظ الوقت حتى لو ثواني
     const session = voiceSessions.get(userId);
     if (session) {
-      const minutes = Math.floor((now - session.joinedAt) / 60000);
-      if (minutes > 0) attendanceStore.addVoiceMinutes(userId, minutes);
+      const seconds = Math.floor((now - session.joinedAt) / 1000);
+      const minutes = Math.max(1, Math.floor(seconds / 60)); // دقيقة على الأقل لو جلس أكثر من 30 ثانية
+      if (seconds >= 30) attendanceStore.addVoiceMinutes(userId, minutes);
       voiceSessions.delete(userId);
     }
   } else if (oldChannel && newChannel && oldChannel !== newChannel) {
-    // انتقل لروم ثاني
+    // انتقل لروم ثاني — نحفظ وقت الروم السابق
     const session = voiceSessions.get(userId);
     if (session) {
-      const minutes = Math.floor((now - session.joinedAt) / 60000);
+      const seconds = Math.floor((now - session.joinedAt) / 1000);
+      const minutes = Math.floor(seconds / 60);
       if (minutes > 0) attendanceStore.addVoiceMinutes(userId, minutes);
     }
     voiceSessions.set(userId, {
