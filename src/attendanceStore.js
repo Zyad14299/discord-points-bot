@@ -265,8 +265,8 @@ function getVoiceLeaderboard() {
   return Object.entries(data.voiceMinutes || {})
     .map(([userId, mins]) => ({ userId, totalMinutes: Number(mins) || 0 }))
     .filter((e) => e.totalMinutes > 0)
-    .sort((a, b) => b.totalMinutes - a.totalMinutes)
-    .slice(0, 5);
+    .sort((a, b) => b.totalMinutes - a.totalMinutes);
+  // بدون slice عشان نرجع كل الأعضاء
 }
 
 module.exports = {
