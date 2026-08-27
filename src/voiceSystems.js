@@ -98,15 +98,16 @@ function startAfkChecker(client) {
     const now = Date.now();
     const limitMs = 30 * 1000; // 30 ثانية ثابتة
 
-    for (const guild of client.guilds.cache.values()) {
-      const afkChannel = findVoiceChannelByName(guild, config.afkChannelName);
-      if (!afkChannel) continue;
+    for (const [userId, session] of voiceSessions) {
+      if (!session.deafenedAt) continue;
+      const deafDuration = now - session.deafenedAt;
+      if (deafDuration < limitMs) continue;
 
-      for (const [userId, session] of voiceSessions) {
-        if (!session.deafenedAt) continue;
-        if (now - session.deafenedAt < limitMs) continue;
+      // نفحص في كل guild
+      for (const guild of client.guilds.cache.values()) {
+        const afkChannel = findVoiceChannelByName(guild, config.afkChannelName);
+        if (!afkChannel) continue;
 
-        // تأكد إنه لا يزال في السيرفر وليس في روم AFK أصلاً
         let member;
         try {
           member = await guild.members.fetch(userId);
@@ -115,20 +116,22 @@ function startAfkChecker(client) {
         }
 
         if (!member.voice?.channelId) continue;
-        if (member.voice.channelId === afkChannel.id) continue;
+        if (member.voice.channelId === afkChannel.id) {
+          // هو أصلاً في AFK — نجدد deafenedAt عشان ما يتكرر الفحص
+          session.deafenedAt = now;
+          continue;
+        }
 
-        // انقله
         try {
-          await member.voice.setChannel(afkChannel, 'مدفون أكثر من ' + config.afkDeafenMinutes + ' دقيقة');
+          await member.voice.setChannel(afkChannel, `Deafened for 30+ seconds`);
+          console.log(`[AFK] نقل ${userId} لروم AFK`);
           // نحسب وقته في الروم السابق
           const minutes = Math.floor((now - session.joinedAt) / 60000);
           if (minutes > 0) attendanceStore.addVoiceMinutes(userId, minutes);
-          // نبدأ جلسة جديدة من روم AFK
+          // نبدأ جلسة جديدة
           session.joinedAt = now;
           session.channelId = afkChannel.id;
-          // نحافظ على deafenedAt عشان ما نرجع ننقله مرة ثانية
-          // لو ظل مدفون في AFK ما في مشكلة لأنه أصلاً في AFK
-          session.deafenedAt = now; // نجدد الوقت عشان ما ينقل مرة ثانية فور دخوله
+          session.deafenedAt = now;
         } catch (e) {
           console.error(`[AFK] فشل نقل ${userId}:`, e.message);
         }
@@ -438,12 +441,15 @@ function initVoiceSessions(client) {
       if (!voiceState.channelId) continue;
       if (voiceState.member?.user?.bot) continue;
       const userId = voiceState.id;
+      const isDeaf = voiceState.selfDeaf || voiceState.serverDeaf;
       voiceSessions.set(userId, {
         userId,
         joinedAt: now,
         channelId: voiceState.channelId,
-        deafenedAt: (voiceState.selfDeaf || voiceState.serverDeaf) ? now : undefined,
+        // لو مدفون من الأول نبدأ العداد من الحين
+        deafenedAt: isDeaf ? now : undefined,
       });
+      console.log(`[Init] ${userId} — deaf: ${isDeaf} — channel: ${voiceState.channelId}`);
     }
   }
   console.log(`[VoiceSessions] تم تسجيل ${voiceSessions.size} شخص في الرومات عند البدء`);
