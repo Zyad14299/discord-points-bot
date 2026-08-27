@@ -167,10 +167,6 @@ function startAfkChecker(client) {
 
 // ─── ٢. لوحة الساعات الصوتية ─────────────────────────────────
 
-// ID الرسالة المنشورة للوحة (نحفظها عشان نعدلها)
-let leaderboardMessageId = null;
-let leaderboardChannelId = null;
-
 function buildProgressBar(minutes, maxMinutes) {
   const total = 10;
   const filled = maxMinutes > 0 ? Math.round((minutes / maxMinutes) * total) : 0;
@@ -181,14 +177,22 @@ function buildProgressBar(minutes, maxMinutes) {
 async function buildVoiceLeaderboardEmbed(client, guild) {
   const now = Date.now();
 
-  // نجيب الساعات المحفوظة
+  // ١. نجيب كل الأعضاء في السيرفر (مو بوتات)
+  let allMembers;
+  try {
+    allMembers = await guild.members.fetch();
+  } catch {
+    allMembers = guild.members.cache;
+  }
+
+  // ٢. نجيب الساعات المحفوظة
   const savedData = attendanceStore.getVoiceLeaderboard();
   const minutesMap = new Map();
   for (const entry of savedData) {
     minutesMap.set(entry.userId, { totalMinutes: entry.totalMinutes, live: false });
   }
 
-  // نضيف الوقت الحي لكل شخص في روم الحين
+  // ٣. نضيف الوقت الحي
   for (const [userId, session] of voiceSessions) {
     const liveMinutes = Math.floor((now - session.joinedAt) / 60000);
     if (liveMinutes <= 0) continue;
@@ -201,81 +205,105 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
     }
   }
 
-  // نرتب ونأخذ Top 5
-  const top = [...minutesMap.entries()]
-    .map(([userId, data]) => ({ userId, ...data }))
-    .filter(e => e.totalMinutes > 0)
-    .sort((a, b) => b.totalMinutes - a.totalMinutes)
-    .slice(0, 5);
-
-  const maxMinutes = top.length > 0 ? top[0].totalMinutes : 1;
-
-  const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
-    .setTitle('🏆  Voice Hours Leaderboard')
-    .setDescription('> The most active members in voice channels this session')
-    .setTimestamp();
-
-  if (top.length === 0) {
-    embed
-      .addFields({ name: '\u200b', value: '```\n  No hours recorded yet\n  Join any voice channel to start\n```' })
-      .setFooter({ text: '🔄 Updates every 30 seconds' });
-    return embed;
-  }
-
-  const RANK_EMOJIS = ['👑', '🥈', '🥉', '4️⃣', '5️⃣'];
-
-  for (let i = 0; i < top.length; i++) {
-    const entry = top[i];
-    const hours = Math.floor(entry.totalMinutes / 60);
-    const mins = entry.totalMinutes % 60;
-    const timeStr = hours > 0
-      ? `${hours}h ${mins > 0 ? mins + 'm' : ''}`
-      : `${mins}m`;
-
-    const bar = buildProgressBar(entry.totalMinutes, maxMinutes);
-    const liveTag = entry.live ? '  🔴 **LIVE**' : '';
-
-    embed.addFields({
-      name: `${RANK_EMOJIS[i]}  Rank #${i + 1}${liveTag}`,
-      value: `<@${entry.userId}>\n\`${bar}\`  ⏱️ **${timeStr}**`,
-      inline: false,
+  // ٤. نبني قائمة كل الأعضاء (مو بوتات)
+  const entries = [];
+  for (const [memberId, member] of allMembers) {
+    if (member.user.bot) continue;
+    const data = minutesMap.get(memberId) || { totalMinutes: 0, live: false };
+    // نشوف إذا في روم الحين
+    const inVoice = voiceSessions.has(memberId);
+    entries.push({
+      userId: memberId,
+      displayName: member.displayName,
+      totalMinutes: data.totalMinutes,
+      live: inVoice,
     });
   }
 
-  embed
-    .addFields({ name: '\u200b', value: '🔴 = In voice now' })
-    .setFooter({ text: '🔄 Updates every 30 seconds' });
+  // ٥. نرتب من الأكثر للأقل
+  entries.sort((a, b) => b.totalMinutes - a.totalMinutes);
 
-  return embed;
+  // ٦. نبني الـ embed — نقسم لأجزاء لأن Discord يحد الـ embed بـ 6000 حرف
+  const lines = entries.map((e, i) => {
+    const h = Math.floor(e.totalMinutes / 60);
+    const m = e.totalMinutes % 60;
+    const timeStr = e.totalMinutes === 0
+      ? '0h 0m'
+      : h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}` : `${m}m`;
+    const liveIcon = e.live ? ' 🔴' : '⚫';
+    return `${liveIcon} **#${i + 1}** <@${e.userId}> — ⏱️ **${timeStr}**`;
+  });
+
+  // نقسم لـ chunks بـ 20 سطر كل chunk
+  const chunkSize = 20;
+  const chunks = [];
+  for (let i = 0; i < lines.length; i += chunkSize) {
+    chunks.push(lines.slice(i, i + chunkSize).join('\n'));
+  }
+
+  const embeds = chunks.map((chunk, i) => {
+    const e = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setDescription(chunk);
+    if (i === 0) {
+      e.setTitle('🏆  Voice Hours Leaderboard');
+    }
+    if (i === chunks.length - 1) {
+      e.setFooter({ text: `🔴 In voice now  •  🔄 Updates every 30s  •  ${entries.length} members` });
+      e.setTimestamp();
+    }
+    return e;
+  });
+
+  return embeds;
 }
+
+// نحفظ IDs الرسائل المنشورة (قد تكون أكثر من رسالة)
+let leaderboardMessageIds = [];
+let leaderboardChannelId = null;
 
 async function updateVoiceLeaderboard(client) {
   for (const guild of client.guilds.cache.values()) {
     const channel = findChannelByName(guild, config.voiceLeaderboardChannelName);
     if (!channel) continue;
 
-    const embed = await buildVoiceLeaderboardEmbed(client, guild);
+    const embeds = await buildVoiceLeaderboardEmbed(client, guild);
 
-    // لو عندنا رسالة سابقة نعدلها
-    if (leaderboardMessageId && leaderboardChannelId === channel.id) {
-      try {
-        const msg = await channel.messages.fetch(leaderboardMessageId);
-        await msg.edit({ embeds: [embed] });
-        continue;
-      } catch {
-        // الرسالة اتحذفت، ننشر جديدة
-        leaderboardMessageId = null;
+    // لو عندنا رسائل سابقة بنفس العدد — نعدلها
+    if (
+      leaderboardMessageIds.length === embeds.length &&
+      leaderboardChannelId === channel.id
+    ) {
+      let allOk = true;
+      for (let i = 0; i < leaderboardMessageIds.length; i++) {
+        try {
+          const msg = await channel.messages.fetch(leaderboardMessageIds[i]);
+          await msg.edit({ embeds: [embeds[i]] });
+        } catch {
+          allOk = false;
+          break;
+        }
       }
+      if (allOk) continue;
     }
 
-    // ننشر رسالة جديدة
-    try {
-      const msg = await channel.send({ embeds: [embed] });
-      leaderboardMessageId = msg.id;
-      leaderboardChannelId = channel.id;
-    } catch (e) {
-      console.error('[Leaderboard] فشل النشر:', e.message);
+    // نحذف الرسائل القديمة ونبدأ من جديد
+    for (const msgId of leaderboardMessageIds) {
+      try {
+        const msg = await channel.messages.fetch(msgId);
+        await msg.delete();
+      } catch { /* تجاهل */ }
+    }
+    leaderboardMessageIds = [];
+    leaderboardChannelId = channel.id;
+
+    for (const embed of embeds) {
+      try {
+        const msg = await channel.send({ embeds: [embed] });
+        leaderboardMessageIds.push(msg.id);
+      } catch (e) {
+        console.error('[Leaderboard] فشل النشر:', e.message);
+      }
     }
   }
 }
