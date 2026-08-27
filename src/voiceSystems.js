@@ -94,62 +94,75 @@ function handleVoiceStateForSystems(oldState, newState, client) {
  * لو شخص مدفون أكثر من config.afkDeafenMinutes → ينقل لـ AFK
  */
 function startAfkChecker(client) {
+  // Map مؤقتة: userId -> وقت أول ما شفناه مدفون
+  const deafSince = new Map();
+
   setInterval(async () => {
     const now = Date.now();
-    const limitMs = 30 * 1000; // 30 ثانية
+    const limitMs = 30 * 60 * 1000; // 30 دقيقة
 
     for (const guild of client.guilds.cache.values()) {
       const afkChannel = findVoiceChannelByName(guild, config.afkChannelName);
       if (!afkChannel) continue;
 
-      // نفحص كل شخص في أي روم صوتي مباشرة
-      for (const [, voiceState] of guild.voiceStates.cache) {
+      // نجيب أحدث نسخة من voiceStates
+      const voiceStates = guild.voiceStates.cache;
+
+      for (const [userId, voiceState] of voiceStates) {
         if (!voiceState.channelId) continue;
         if (voiceState.member?.user?.bot) continue;
-        if (voiceState.channelId === afkChannel.id) continue;
+        if (voiceState.channelId === afkChannel.id) {
+          deafSince.delete(userId);
+          continue;
+        }
 
-        const userId = voiceState.id;
         const isDeaf = voiceState.selfDeaf || voiceState.serverDeaf;
 
         if (!isDeaf) {
-          // مو مدفون — نمسح وقت الدفن لو كان موجود
-          const session = voiceSessions.get(userId);
-          if (session) delete session.deafenedAt;
+          deafSince.delete(userId);
           continue;
         }
 
-        // مدفون — نسجل وقت البدء لو ما سجلنا
-        const session = voiceSessions.get(userId);
-        if (!session) continue;
-
-        if (!session.deafenedAt) {
-          session.deafenedAt = now;
+        // مدفون — سجّل وقت البدء لو ما سجلنا
+        if (!deafSince.has(userId)) {
+          deafSince.set(userId, now);
           continue;
         }
 
-        // نشوف قديش صار مدفون
-        if (now - session.deafenedAt < limitMs) continue;
+        const elapsed = now - deafSince.get(userId);
+        if (elapsed < limitMs) continue;
 
-        // ننقله لـ AFK
+        // تجاوز 30 دقيقة — ننقله
         try {
-          const member = voiceState.member || await guild.members.fetch(userId).catch(() => null);
-          if (!member) continue;
+          const member = voiceState.member ?? await guild.members.fetch(userId).catch(() => null);
+          if (!member?.voice?.channelId) continue;
+          if (member.voice.channelId === afkChannel.id) { deafSince.delete(userId); continue; }
 
-          await member.voice.setChannel(afkChannel, 'Deafened for 30+ seconds');
-          console.log(`[AFK] نقل ${userId} لروم AFK`);
+          await member.voice.setChannel(afkChannel, 'Deafened for 30+ minutes');
+          console.log(`[AFK] نقل ${userId} بعد ${Math.floor(elapsed / 60000)} دقيقة دفن`);
+          deafSince.delete(userId);
 
-          const minutes = Math.floor((now - session.joinedAt) / 60000);
-          if (minutes > 0) attendanceStore.addVoiceMinutes(userId, minutes);
-
-          session.joinedAt = now;
-          session.channelId = afkChannel.id;
-          session.deafenedAt = now; // نجدد عشان ما ينقل مرة ثانية فور
+          // نحسب وقته
+          const session = voiceSessions.get(userId);
+          if (session) {
+            const minutes = Math.floor((now - session.joinedAt) / 60000);
+            if (minutes > 0) attendanceStore.addVoiceMinutes(userId, minutes);
+            session.joinedAt = now;
+            session.channelId = afkChannel.id;
+          }
         } catch (e) {
           console.error(`[AFK] فشل نقل ${userId}:`, e.message);
         }
       }
+
+      // نمسح من deafSince أي شخص طلع من الرومات
+      for (const [userId] of deafSince) {
+        if (!voiceStates.has(userId) || !voiceStates.get(userId)?.channelId) {
+          deafSince.delete(userId);
+        }
+      }
     }
-  }, 10 * 1000);
+  }, 30 * 1000); // فحص كل 30 ثانية
 }
 
 // ─── ٢. لوحة الساعات الصوتية ─────────────────────────────────
@@ -268,8 +281,10 @@ async function updateVoiceLeaderboard(client) {
 }
 
 function startVoiceLeaderboard(client) {
-  // ننشر مرة وحدة فقط عند البدء
+  // أول تحديث بعد 5 ثواني من البدء
   setTimeout(() => updateVoiceLeaderboard(client), 5000);
+  // ثم كل 30 ثانية
+  setInterval(() => updateVoiceLeaderboard(client), 30 * 1000);
 }
 
 // ─── ٣. لوقات المودريشن ──────────────────────────────────────
