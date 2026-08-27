@@ -143,14 +143,6 @@ function startAfkChecker(client) {
 let leaderboardMessageId = null;
 let leaderboardChannelId = null;
 
-const RANK_STYLES = [
-  { emoji: '👑', label: 'الأول',  color: 0xFFD700 },
-  { emoji: '🥈', label: 'الثاني', color: 0xC0C0C0 },
-  { emoji: '🥉', label: 'الثالث', color: 0xCD7F32 },
-  { emoji: '4️⃣', label: 'الرابع', color: 0x5865f2 },
-  { emoji: '5️⃣', label: 'الخامس', color: 0x5865f2 },
-];
-
 function buildProgressBar(minutes, maxMinutes) {
   const total = 10;
   const filled = maxMinutes > 0 ? Math.round((minutes / maxMinutes) * total) : 0;
@@ -191,51 +183,41 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
   const maxMinutes = top.length > 0 ? top[0].totalMinutes : 1;
 
   const embed = new EmbedBuilder()
-    .setColor(0x2b2d31)
-    .setTitle('🎙️  Voice Hours Leaderboard')
+    .setColor(0x5865f2)
+    .setTitle('🏆  Voice Hours Leaderboard')
+    .setDescription('> The most active members in voice channels this session')
     .setTimestamp();
 
   if (top.length === 0) {
     embed
-      .setDescription(
-        '```\n' +
-        '  No hours recorded yet\n' +
-        '  Join any voice channel to start tracking\n' +
-        '```'
-      )
+      .addFields({ name: '\u200b', value: '```\n  No hours recorded yet\n  Join any voice channel to start\n```' })
       .setFooter({ text: '🔄 Updates every 30 seconds' });
     return embed;
   }
 
-  const lines = await Promise.all(
-    top.map(async (entry, i) => {
-      const style = RANK_STYLES[i];
-      let display = `<@${entry.userId}>`;
-      try {
-        await guild.members.fetch(entry.userId);
-      } catch { /* keep mention */ }
+  const RANK_EMOJIS = ['👑', '🥈', '🥉', '4️⃣', '5️⃣'];
 
-      const hours = Math.floor(entry.totalMinutes / 60);
-      const mins = entry.totalMinutes % 60;
-      const timeStr = hours > 0
-        ? `${hours}h ${mins > 0 ? mins + 'm' : ''}`
-        : `${mins}m`;
+  for (let i = 0; i < top.length; i++) {
+    const entry = top[i];
+    const hours = Math.floor(entry.totalMinutes / 60);
+    const mins = entry.totalMinutes % 60;
+    const timeStr = hours > 0
+      ? `${hours}h ${mins > 0 ? mins + 'm' : ''}`
+      : `${mins}m`;
 
-      const bar = buildProgressBar(entry.totalMinutes, maxMinutes);
-      const liveIndicator = entry.live ? ' 🔴' : '';
+    const bar = buildProgressBar(entry.totalMinutes, maxMinutes);
+    const liveTag = entry.live ? '  🔴 **LIVE**' : '';
 
-      return [
-        `${style.emoji} **Rank #${i + 1}**${liveIndicator}`,
-        `┣ ${display}`,
-        `┣ \`${bar}\``,
-        `┗ ⏱️ **${timeStr}**`,
-      ].join('\n');
-    })
-  );
+    embed.addFields({
+      name: `${RANK_EMOJIS[i]}  Rank #${i + 1}${liveTag}`,
+      value: `<@${entry.userId}>\n\`${bar}\`  ⏱️ **${timeStr}**`,
+      inline: false,
+    });
+  }
 
   embed
-    .setDescription(lines.join('\n\n'))
-    .setFooter({ text: '🔴 = In voice now  •  🔄 Updates every 30 seconds' });
+    .addFields({ name: '\u200b', value: '🔴 = In voice now' })
+    .setFooter({ text: '🔄 Updates every 30 seconds' });
 
   return embed;
 }
