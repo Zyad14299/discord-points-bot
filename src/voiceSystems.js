@@ -192,18 +192,18 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
 
   const embed = new EmbedBuilder()
     .setColor(0x2b2d31)
-    .setTitle('━━━━━━━━━━━━━━━━━━━━━━\n🎙️  لوحة الساعات الصوتية\n━━━━━━━━━━━━━━━━━━━━━━')
+    .setTitle('🎙️  Voice Hours Leaderboard')
     .setTimestamp();
 
   if (top.length === 0) {
     embed
       .setDescription(
         '```\n' +
-        '  ما في أحد سجّل ساعات بعد\n' +
-        '  ادخل أي روم صوتي تبدأ العداد\n' +
+        '  No hours recorded yet\n' +
+        '  Join any voice channel to start tracking\n' +
         '```'
       )
-      .setFooter({ text: '🔄 تتحدث كل 30 ثانية' });
+      .setFooter({ text: '🔄 Updates every 30 seconds' });
     return embed;
   }
 
@@ -213,19 +213,19 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
       let display = `<@${entry.userId}>`;
       try {
         await guild.members.fetch(entry.userId);
-      } catch { /* نبقى بالمنشن */ }
+      } catch { /* keep mention */ }
 
       const hours = Math.floor(entry.totalMinutes / 60);
       const mins = entry.totalMinutes % 60;
       const timeStr = hours > 0
-        ? `${hours}س ${mins > 0 ? mins + 'د' : ''}`
-        : `${mins}د`;
+        ? `${hours}h ${mins > 0 ? mins + 'm' : ''}`
+        : `${mins}m`;
 
       const bar = buildProgressBar(entry.totalMinutes, maxMinutes);
       const liveIndicator = entry.live ? ' 🔴' : '';
 
       return [
-        `${style.emoji} **المركز ${style.label}**${liveIndicator}`,
+        `${style.emoji} **Rank #${i + 1}**${liveIndicator}`,
         `┣ ${display}`,
         `┣ \`${bar}\``,
         `┗ ⏱️ **${timeStr}**`,
@@ -235,7 +235,7 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
 
   embed
     .setDescription(lines.join('\n\n'))
-    .setFooter({ text: '🔴 = في روم الآن  •  🔄 تتحدث كل 30 ثانية' });
+    .setFooter({ text: '🔴 = In voice now  •  🔄 Updates every 30 seconds' });
 
   return embed;
 }
