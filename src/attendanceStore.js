@@ -266,7 +266,28 @@ function addVoiceMinutes(userId, minutes) {
   const data = readStore();
   data.voiceMinutes = data.voiceMinutes || {};
   const prev = Number(data.voiceMinutes[userId] || 0);
-  data.voiceMinutes[userId] = prev + minutes;
+  data.voiceMinutes[userId] = Math.max(0, prev + minutes);
+  writeStore(data);
+}
+
+function removeVoiceMinutes(userId, minutes) {
+  const data = readStore();
+  data.voiceMinutes = data.voiceMinutes || {};
+  const prev = Number(data.voiceMinutes[userId] || 0);
+  data.voiceMinutes[userId] = Math.max(0, prev - minutes);
+  writeStore(data);
+}
+
+function resetVoiceMinutes(userId) {
+  const data = readStore();
+  data.voiceMinutes = data.voiceMinutes || {};
+  data.voiceMinutes[userId] = 0;
+  writeStore(data);
+}
+
+function resetAllVoiceMinutes() {
+  const data = readStore();
+  data.voiceMinutes = {};
   writeStore(data);
 }
 
@@ -307,6 +328,9 @@ module.exports = {
   setVoiceData,
   clearVoiceData,
   addVoiceMinutes,
+  removeVoiceMinutes,
+  resetVoiceMinutes,
+  resetAllVoiceMinutes,
   getVoiceMinutes,
   getVoiceLeaderboard,
 };

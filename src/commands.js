@@ -74,9 +74,55 @@ const commands = [
     .addSubcommand((sub) =>
       sub.setName('تصفير-الكل').setDescription('تصفير ساعات الجميع')
     ),
+
   new SlashCommandBuilder()
     .setName('مخالفين')
     .setDescription('عرض الأعضاء الذين ساعاتهم أقل من 12 ساعة هذا الأسبوع')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  // ─── أوامر الساعات الصوتية ───
+  new SlashCommandBuilder()
+    .setName('voice')
+    .setDescription('إدارة ساعات الروم الصوتي')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand((sub) =>
+      sub
+        .setName('add')
+        .setDescription('أضف وقت لعضو')
+        .addUserOption((o) =>
+          o.setName('عضو').setDescription('العضو').setRequired(true)
+        )
+        .addIntegerOption((o) =>
+          o.setName('دقائق').setDescription('عدد الدقائق').setRequired(true).setMinValue(1)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('remove')
+        .setDescription('اسحب وقت من عضو')
+        .addUserOption((o) =>
+          o.setName('عضو').setDescription('العضو').setRequired(true)
+        )
+        .addIntegerOption((o) =>
+          o.setName('دقائق').setDescription('عدد الدقائق').setRequired(true).setMinValue(1)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('reset')
+        .setDescription('صفّر ساعات عضو')
+        .addUserOption((o) =>
+          o.setName('عضو').setDescription('العضو').setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub.setName('reset-all').setDescription('صفّر ساعات الجميع في اللوحة الصوتية')
+    ),
+
+  // ─── لوحة الفائزين الأسبوعية ───
+  new SlashCommandBuilder()
+    .setName('winners')
+    .setDescription('عرض لوحة الفائزين الأسبوعيين')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
 ].map((command) => command.toJSON());

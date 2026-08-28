@@ -7,6 +7,100 @@ const {
 const store = require('./attendanceStore');
 const config = require('./config');
 
+// ─── أمر voice ────────────────────────────────────────────────
+
+async function handleVoiceCommand(interaction) {
+  if (!isAdmin(interaction.user.id, interaction.member)) {
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ flags: 64 });
+  const sub = interaction.options.getSubcommand();
+  const user = interaction.options.getUser('عضو', sub !== 'reset-all');
+
+  if (sub === 'add') {
+    const mins = interaction.options.getInteger('دقائق', true);
+    store.addVoiceMinutes(user.id, mins);
+    const total = store.getVoiceMinutes(user.id);
+    const h = Math.floor(total / 60), m = total % 60;
+    await interaction.editReply({
+      content: `✅ تمت إضافة **${mins} دقيقة** لـ ${user}\nالإجمالي الآن: **${h}س ${m}د**`,
+    });
+    return;
+  }
+
+  if (sub === 'remove') {
+    const mins = interaction.options.getInteger('دقائق', true);
+    store.removeVoiceMinutes(user.id, mins);
+    const total = store.getVoiceMinutes(user.id);
+    const h = Math.floor(total / 60), m = total % 60;
+    await interaction.editReply({
+      content: `✅ تم سحب **${mins} دقيقة** من ${user}\nالإجمالي الآن: **${h}س ${m}د**`,
+    });
+    return;
+  }
+
+  if (sub === 'reset') {
+    store.resetVoiceMinutes(user.id);
+    await interaction.editReply({ content: `✅ تم تصفير ساعات ${user} في اللوحة الصوتية.` });
+    return;
+  }
+
+  if (sub === 'reset-all') {
+    store.resetAllVoiceMinutes();
+    await interaction.editReply({ content: '✅ تم تصفير ساعات الجميع في اللوحة الصوتية.' });
+  }
+}
+
+// ─── أمر winners ──────────────────────────────────────────────
+
+async function handleWinnersCommand(interaction) {
+  if (!isAdmin(interaction.user.id, interaction.member)) {
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply();
+
+  const leaderboard = store.getVoiceLeaderboard();
+  const top7 = leaderboard.slice(0, 7);
+
+  if (top7.length === 0) {
+    await interaction.editReply({ content: 'ما في ساعات مسجلة بعد.' });
+    return;
+  }
+
+  const RANKS = [
+    { emoji: '👑', label: '1st Place', win: true },
+    { emoji: '🥈', label: '2nd Place', win: true },
+    { emoji: '🥉', label: '3rd Place', win: true },
+    { emoji: '4️⃣', label: '4th Place', win: false },
+    { emoji: '5️⃣', label: '5th Place', win: false },
+    { emoji: '6️⃣', label: '6th Place', win: false },
+    { emoji: '7️⃣', label: '7th Place', win: false },
+  ];
+
+  const lines = top7.map((entry, i) => {
+    const rank = RANKS[i];
+    const h = Math.floor(entry.totalMinutes / 60);
+    const m = entry.totalMinutes % 60;
+    const timeStr = h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}` : `${m}m`;
+    const tag = rank.win
+      ? `🎉 **Congratulations!**`
+      : `💪 **Hard Luck!**`;
+    return `${rank.emoji} ${tag}\n┗ <@${entry.userId}> — ⏱️ **${timeStr}**`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setColor(0xFFD700)
+    .setTitle('🏆  Weekly Voice Leaderboard')
+    .setDescription(lines.join('\n\n'))
+    .setFooter({ text: `Top ${top7.length} members this week` })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
 function isAdmin(userId, member) {
   if (config.adminIds.includes(userId)) return true;
   if (member?.permissions?.has?.('Administrator')) return true;
@@ -513,6 +607,14 @@ async function handleInteraction(interaction) {
     }
     if (interaction.commandName === 'مخالفين') {
       await handleViolators(interaction);
+      return;
+    }
+    if (interaction.commandName === 'voice') {
+      await handleVoiceCommand(interaction);
+      return;
+    }
+    if (interaction.commandName === 'winners') {
+      await handleWinnersCommand(interaction);
       return;
     }
   }

@@ -242,8 +242,7 @@ async function buildVoiceLeaderboardEmbed(client, guild) {
   });
 
   // نقسم لـ chunks بـ 20 سطر كل chunk
-  const chunkSize = 20;
-  const chunks = [];
+  const chunkSize = 20;  const chunks = [];
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'));
   }
