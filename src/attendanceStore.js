@@ -9,6 +9,15 @@ function ensureStore() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
   if (!fs.existsSync(DATA_FILE)) {
+    // نحاول نجيب البيانات من متغير البيئة لو موجود (للـ Railway)
+    const envData = process.env.BOT_PERSIST_DATA;
+    if (envData) {
+      try {
+        const parsed = JSON.parse(Buffer.from(envData, 'base64').toString('utf8'));
+        fs.writeFileSync(DATA_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+        return;
+      } catch { /* نكمل بالملف الجديد */ }
+    }
     fs.writeFileSync(
       DATA_FILE,
       JSON.stringify(
@@ -22,6 +31,7 @@ function ensureStore() {
           },
           exceptions: {},
           voiceData: { lastVoiceSeenAt: {}, isInVoice: {} },
+          voiceMinutes: {},
         },
         null,
         2
@@ -51,6 +61,10 @@ function readStore() {
         data.voiceData && typeof data.voiceData === 'object'
           ? data.voiceData
           : { lastVoiceSeenAt: {}, isInVoice: {} },
+      voiceMinutes:
+        data.voiceMinutes && typeof data.voiceMinutes === 'object'
+          ? data.voiceMinutes
+          : {},
     };
   } catch {
     return {
@@ -59,6 +73,7 @@ function readStore() {
       meta: { warningChannelId: null, moveLogChannelId: null, moveLogEnabled: false },
       exceptions: {},
       voiceData: { lastVoiceSeenAt: {}, isInVoice: {} },
+      voiceMinutes: {},
     };
   }
 }
