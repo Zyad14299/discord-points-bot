@@ -231,3 +231,13 @@ client.on(Events.GuildAuditLogEntryCreate, async (entry, guild) => {
 });
 
 client.login(config.token);
+
+// ─── Keep-Alive لـ Render ──────────────────────────────────────
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Bot is running!');
+}).listen(PORT, () => {
+  console.log(`[Keep-Alive] HTTP server on port ${PORT}`);
+});
