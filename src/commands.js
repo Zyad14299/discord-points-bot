@@ -125,6 +125,33 @@ const commands = [
     .setDescription('عرض لوحة الفائزين الأسبوعيين')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
+  // ─── أوامر التذاكر ───
+  new SlashCommandBuilder()
+    .setName('تذاكر-نشر')
+    .setDescription('نشر لوحة فتح التذاكر في هذا الروم')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('تذاكر-إعداد')
+    .setDescription('إعداد نظام التذاكر')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand((sub) =>
+      sub
+        .setName('رول-الدعم')
+        .setDescription('تحديد رول فريق الدعم الذي يرى التذاكر')
+        .addRoleOption((o) =>
+          o.setName('رول').setDescription('الرول').setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('قناة-اللوق')
+        .setDescription('تحديد قناة لوقات التذاكر')
+        .addChannelOption((o) =>
+          o.setName('قناة').setDescription('القناة').setRequired(true)
+        )
+    ),
+
 ].map((command) => command.toJSON());
 
 module.exports = { commands };

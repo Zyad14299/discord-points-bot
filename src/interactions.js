@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const store = require('./attendanceStore');
 const config = require('./config');
+const { ticketPanelEmbed, ticketPanelButtons, handleTicketInteraction, setConfig } = require('./ticketSystem');
 
 // ─── أمر voice ────────────────────────────────────────────────
 
@@ -587,6 +588,42 @@ async function handleViolators(interaction) {
   await interaction.editReply({ embeds: embeds.slice(0, 10) });
 }
 
+async function handleTicketSetup(interaction) {
+  if (!isAdmin(interaction.user.id, interaction.member)) {
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+  const sub = interaction.options.getSubcommand();
+
+  if (sub === 'رول-الدعم') {
+    const role = interaction.options.getRole('رول', true);
+    setConfig(interaction.guild.id, { supportRoleId: role.id });
+    await interaction.editReply({ content: `✅ تم تحديد رول الدعم: ${role}` });
+    return;
+  }
+
+  if (sub === 'قناة-اللوق') {
+    const channel = interaction.options.getChannel('قناة', true);
+    setConfig(interaction.guild.id, { logChannelId: channel.id });
+    await interaction.editReply({ content: `✅ تم تحديد قناة اللوق: ${channel}` });
+  }
+}
+
+async function handleTicketPost(interaction) {
+  if (!isAdmin(interaction.user.id, interaction.member)) {
+    await interaction.reply({ content: 'هذا الأمر للأدمن فقط.', ephemeral: true });
+    return;
+  }
+
+  await interaction.reply({ content: '✅ تم نشر لوحة التذاكر.', ephemeral: true });
+  await interaction.channel.send({
+    embeds: [ticketPanelEmbed()],
+    components: [ticketPanelButtons()],
+  });
+}
+
 async function handleInteraction(interaction) {
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'حضور') {
@@ -617,9 +654,20 @@ async function handleInteraction(interaction) {
       await handleWinnersCommand(interaction);
       return;
     }
+    if (interaction.commandName === 'تذاكر-نشر') {
+      await handleTicketPost(interaction);
+      return;
+    }
+    if (interaction.commandName === 'تذاكر-إعداد') {
+      await handleTicketSetup(interaction);
+      return;
+    }
   }
 
   if (interaction.isButton()) {
+    // نظام التذاكر أولاً
+    const handled = await handleTicketInteraction(interaction);
+    if (handled) return;
     if (interaction.customId === 'att_login') {
       await handleLogin(interaction);
       return;
